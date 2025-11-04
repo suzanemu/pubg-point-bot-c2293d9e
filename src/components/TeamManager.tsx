@@ -6,13 +6,12 @@ import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
-import { Copy, Plus, Trash2, Trophy } from "lucide-react";
+import { Plus, Trash2, Trophy } from "lucide-react";
 import { Tournament } from "@/types/tournament";
 
 interface Team {
   id: string;
   name: string;
-  access_code?: string;
   logo_url?: string;
 }
 
@@ -64,29 +63,9 @@ export default function TeamManager() {
       return;
     }
 
-    // Fetch access codes for each team
-    const { data: codesData } = await supabase
-      .from("access_codes")
-      .select("team_id, code")
-      .eq("role", "player")
-      .eq("tournament_id", selectedTournament);
-
-    const teamsWithCodes = teamsData.map((team) => ({
-      ...team,
-      access_code: codesData?.find((code) => code.team_id === team.id)?.code,
-    }));
-
-    setTeams(teamsWithCodes);
+    setTeams(teamsData || []);
   };
 
-  const generateAccessCode = () => {
-    const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
-    let code = "";
-    for (let i = 0; i < 8; i++) {
-      code += chars.charAt(Math.floor(Math.random() * chars.length));
-    }
-    return code;
-  };
 
   const handleAddTeam = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -129,38 +108,20 @@ export default function TeamManager() {
       }
 
       // Create team
-      const { data: teamData, error: teamError } = await supabase
+      const { error: teamError } = await supabase
         .from("teams")
         .insert({ 
           name: newTeamName.trim(), 
           tournament_id: selectedTournament,
           logo_url: logoUrl 
-        })
-        .select()
-        .single();
+        });
 
       if (teamError) {
         toast.error("Failed to create team");
         return;
       }
 
-      // Generate access code for the team
-      const accessCode = generateAccessCode();
-      const { error: codeError } = await supabase
-        .from("access_codes")
-        .insert({
-          code: accessCode,
-          role: "player",
-          team_id: teamData.id,
-          tournament_id: selectedTournament,
-        });
-
-      if (codeError) {
-        toast.error("Team created but failed to generate access code");
-        return;
-      }
-
-      toast.success(`Team created! Access code: ${accessCode}`);
+      toast.success("Team created successfully!");
       setNewTeamName("");
       setLogoFile(null);
       fetchTeams();
@@ -188,10 +149,6 @@ export default function TeamManager() {
     fetchTeams();
   };
 
-  const copyAccessCode = (code: string) => {
-    navigator.clipboard.writeText(code);
-    toast.success("Access code copied!");
-  };
 
   if (tournaments.length === 0) {
     return (
@@ -256,7 +213,7 @@ export default function TeamManager() {
       </Card>
 
       <Card className="p-6">
-        <h2 className="text-2xl font-bold mb-4">Teams & Access Codes</h2>
+        <h2 className="text-2xl font-bold mb-4">Teams</h2>
         <div className="space-y-3">
           {teams.length === 0 ? (
             <p className="text-muted-foreground text-center py-4">
@@ -282,20 +239,6 @@ export default function TeamManager() {
                   )}
                   <div>
                     <h3 className="font-semibold">{team.name}</h3>
-                    {team.access_code && (
-                      <div className="flex items-center gap-2 mt-1">
-                        <code className="text-sm bg-muted px-2 py-1 rounded">
-                          {team.access_code}
-                        </code>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => copyAccessCode(team.access_code!)}
-                        >
-                          <Copy className="w-3 h-3" />
-                        </Button>
-                      </div>
-                    )}
                   </div>
                 </div>
                 <Button

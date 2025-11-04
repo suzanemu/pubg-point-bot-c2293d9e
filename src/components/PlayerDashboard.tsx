@@ -5,6 +5,7 @@ import { Card } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Upload, LogOut, Loader2, Trophy, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
@@ -18,7 +19,8 @@ interface PlayerDashboardProps {
 const PlayerDashboard = ({ userId }: PlayerDashboardProps) => {
   const navigate = useNavigate();
   const [teams, setTeams] = useState<Team[]>([]);
-  const [userTeam, setUserTeam] = useState<Team | null>(null);
+  const [allTeams, setAllTeams] = useState<{ id: string; name: string; logo_url?: string }[]>([]);
+  const [selectedTeamId, setSelectedTeamId] = useState<string>("");
   const [tournament, setTournament] = useState<Tournament | null>(null);
   const [matchNumber, setMatchNumber] = useState(1);
   const [uploading, setUploading] = useState(false);
@@ -27,114 +29,54 @@ const PlayerDashboard = ({ userId }: PlayerDashboardProps) => {
   const [uploadedMatches, setUploadedMatches] = useState<number>(0);
 
   useEffect(() => {
-    fetchUserTeam();
-  }, [userId]);
-
-  useEffect(() => {
-    if (userTeam?.tournament_id) {
-      fetchTeams();
-    }
-  }, [userTeam?.tournament_id]);
+    fetchTournamentAndTeams();
+  }, []);
 
   useEffect(() => {
     // Auto-refresh every 5 seconds
     const interval = setInterval(() => {
-      fetchUserTeam();
+      fetchTeams();
     }, 5000);
     
     return () => clearInterval(interval);
-  }, [userId]);
+  }, [tournament?.id]);
 
-  const fetchUserTeam = async () => {
-    // Get user's session to find their team
-    const { data: sessionData, error: sessionError } = await supabase
-      .from("sessions")
-      .select("team_id")
-      .eq("user_id", userId)
+  const fetchTournamentAndTeams = async () => {
+    // Fetch the first tournament (or you can let user select)
+    const { data: tournamentData } = await supabase
+      .from("tournaments")
+      .select("*")
+      .order("created_at", { ascending: false })
+      .limit(1)
       .single();
 
-    if (sessionError || !sessionData?.team_id) {
-      console.error("Error fetching user team:", sessionError);
-      return;
-    }
-
-    // Get team details
-    const { data: teamData, error: teamError } = await supabase
-      .from("teams")
-      .select("id, name, created_at, tournament_id")
-      .eq("id", sessionData.team_id)
-      .single();
-
-    if (teamError) {
-      console.error("Error fetching team details:", teamError);
-      return;
-    }
-
-    // Fetch tournament info if team has one
-    if (teamData.tournament_id) {
-      const { data: tournamentData } = await supabase
-        .from("tournaments")
-        .select("*")
-        .eq("id", teamData.tournament_id)
-        .single();
-      
+    if (tournamentData) {
       setTournament(tournamentData);
-    }
-
-    // Get team stats from match_screenshots
-    const { data: matchData, error: matchError } = await supabase
-      .from("match_screenshots")
-      .select("placement, kills, points, match_number")
-      .eq("team_id", sessionData.team_id);
-
-    let totalPoints = 0;
-    let totalKills = 0;
-    let placementPoints = 0;
-    let killPoints = 0;
-    let matchesPlayed = 0;
-    let firstPlaceWins = 0;
-
-    if (matchData && !matchError) {
-      matchesPlayed = matchData.length;
-      setUploadedMatches(matchData.length);
-      firstPlaceWins = matchData.filter((m) => m.placement === 1).length;
       
-      matchData.forEach((match) => {
-        totalKills += match.kills || 0;
-        totalPoints += match.points || 0;
-        
-        // Calculate placement points (total - kills)
-        const PLACEMENT_POINTS: Record<number, number> = {
-          1: 10, 2: 6, 3: 5, 4: 4, 5: 3, 6: 2, 7: 1, 8: 1,
-          9: 0, 10: 0, 11: 0, 12: 0, 13: 0, 14: 0, 15: 0, 16: 0,
-          17: 0, 18: 0, 19: 0, 20: 0, 21: 0, 22: 0, 23: 0, 24: 0,
-          25: 0, 26: 0, 27: 0, 28: 0, 29: 0, 30: 0, 31: 0, 32: 0,
-        };
-        placementPoints += PLACEMENT_POINTS[match.placement || 0] || 0;
-      });
-      killPoints = totalKills; // 1 point per kill
+      // Fetch all teams in this tournament
+      const { data: teamsData } = await supabase
+        .from("teams")
+        .select("id, name, logo_url")
+        .eq("tournament_id", tournamentData.id);
+      
+      if (teamsData) {
+        setAllTeams(teamsData);
+        if (teamsData.length > 0 && !selectedTeamId) {
+          setSelectedTeamId(teamsData[0].id);
+        }
+      }
+      
+      fetchTeams();
     }
-
-    setUserTeam({
-      id: teamData.id,
-      name: teamData.name,
-      totalPoints,
-      placementPoints,
-      killPoints,
-      totalKills,
-      matchesPlayed,
-      firstPlaceWins,
-      tournament_id: teamData.tournament_id,
-    });
   };
 
   const fetchTeams = async () => {
-    if (!userTeam?.tournament_id) return;
+    if (!tournament?.id) return;
 
     const { data, error } = await supabase
       .from("teams")
       .select("id, name, created_at")
-      .eq("tournament_id", userTeam.tournament_id);
+      .eq("tournament_id", tournament.id);
 
     if (error) {
       console.error("Error fetching teams:", error);
@@ -191,8 +133,12 @@ const PlayerDashboard = ({ userId }: PlayerDashboardProps) => {
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
     
-    if (files.length === 0 || !userTeam) {
-      toast.error("Unable to identify your team");
+    if (files.length === 0) {
+      return;
+    }
+
+    if (!selectedTeamId) {
+      toast.error("Please select a team first");
       return;
     }
 
@@ -286,7 +232,7 @@ const PlayerDashboard = ({ userId }: PlayerDashboardProps) => {
           const { error: dbError } = await supabase
             .from("match_screenshots")
             .insert({
-              team_id: userTeam.id,
+              team_id: selectedTeamId,
               player_id: userId,
               match_number: matchNumber + i,
               screenshot_url: publicUrl,
@@ -322,7 +268,6 @@ const PlayerDashboard = ({ userId }: PlayerDashboardProps) => {
       e.target.value = "";
       
       // Refresh data
-      fetchUserTeam();
       fetchTeams();
     } catch (error) {
       console.error("Upload error:", error);
@@ -373,59 +318,9 @@ const PlayerDashboard = ({ userId }: PlayerDashboardProps) => {
                   </p>
                 )}
               </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="text-center p-4 bg-background/50 rounded-lg border border-border">
-                  <p className="text-sm text-muted-foreground">Total Matches</p>
-                  <p className="text-2xl font-bold">{tournament.total_matches}</p>
-                </div>
-                <div className="text-center p-4 bg-background/50 rounded-lg border border-primary/30">
-                  <p className="text-sm text-muted-foreground">Uploaded</p>
-                  <p className="text-2xl font-bold text-primary">{uploadedMatches}</p>
-                </div>
-              </div>
-              {!canUploadMore && (
-                <Alert>
-                  <AlertCircle className="h-4 w-4" />
-                  <AlertDescription>
-                    You have uploaded all {tournament.total_matches} matches for this tournament.
-                  </AlertDescription>
-                </Alert>
-              )}
-            </div>
-          </Card>
-        )}
-
-        {/* Team Stats Card */}
-        {userTeam && (
-          <Card className="p-6 border-primary/30 bg-gradient-to-br from-primary/5 to-primary/10">
-            <h2 className="text-2xl font-bold mb-4 flex items-center gap-2">
-              <Trophy className="h-6 w-6 text-primary-glow" />
-              Your Team Stats
-            </h2>
-            <div className="mb-4 p-3 bg-background/50 rounded-lg border border-primary/20">
-              <p className="text-sm text-muted-foreground">Team Name</p>
-              <p className="font-semibold text-xl">{userTeam.name}</p>
-            </div>
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
               <div className="text-center p-4 bg-background/50 rounded-lg border border-border">
-                <p className="text-sm text-muted-foreground mb-1">Matches</p>
-                <p className="text-2xl font-bold">{userTeam.matchesPlayed}</p>
-              </div>
-              <div className="text-center p-4 bg-background/50 rounded-lg border border-yellow-500/30">
-                <p className="text-sm text-muted-foreground mb-1">Place Points</p>
-                <p className="text-2xl font-bold text-yellow-500">{userTeam.placementPoints}</p>
-              </div>
-              <div className="text-center p-4 bg-background/50 rounded-lg border border-accent/30">
-                <p className="text-sm text-muted-foreground mb-1">Kill Points</p>
-                <p className="text-2xl font-bold text-accent">{userTeam.killPoints}</p>
-              </div>
-              <div className="text-center p-4 bg-background/50 rounded-lg border border-border">
-                <p className="text-sm text-muted-foreground mb-1">Total Kills</p>
-                <p className="text-2xl font-bold">{userTeam.totalKills}</p>
-              </div>
-              <div className="text-center p-4 bg-primary/20 rounded-lg border border-primary/50">
-                <p className="text-sm text-muted-foreground mb-1">Total Points</p>
-                <p className="text-3xl font-bold text-primary-glow">{userTeam.totalPoints}</p>
+                <p className="text-sm text-muted-foreground">Total Matches</p>
+                <p className="text-2xl font-bold">{tournament.total_matches}</p>
               </div>
             </div>
           </Card>
@@ -435,6 +330,30 @@ const PlayerDashboard = ({ userId }: PlayerDashboardProps) => {
         <Card className="p-6 border-primary/30">
           <h2 className="text-2xl font-bold mb-4">Upload Match Screenshot</h2>
           <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="teamSelect">Select Team</Label>
+              <Select value={selectedTeamId} onValueChange={setSelectedTeamId}>
+                <SelectTrigger className="bg-input border-border max-w-xs">
+                  <SelectValue placeholder="Choose a team" />
+                </SelectTrigger>
+                <SelectContent>
+                  {allTeams.map((team) => (
+                    <SelectItem key={team.id} value={team.id}>
+                      <div className="flex items-center gap-2">
+                        {team.logo_url && (
+                          <img 
+                            src={team.logo_url} 
+                            alt={team.name}
+                            className="w-5 h-5 rounded object-cover"
+                          />
+                        )}
+                        {team.name}
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
 
             <div className="space-y-2">
               <Label htmlFor="matchNumber">Match Number</Label>
@@ -457,12 +376,12 @@ const PlayerDashboard = ({ userId }: PlayerDashboardProps) => {
                   accept="image/*"
                   multiple
                   onChange={handleFileUpload}
-                  disabled={!userTeam || uploading || analyzing || !canUploadMore}
+                  disabled={!selectedTeamId || uploading || analyzing}
                   className="hidden"
                 />
                 <label
                   htmlFor="screenshot"
-                  className={`${!canUploadMore ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'} flex flex-col items-center gap-2`}
+                  className="cursor-pointer flex flex-col items-center gap-2"
                 >
                   {uploading || analyzing ? (
                     <>
@@ -478,9 +397,7 @@ const PlayerDashboard = ({ userId }: PlayerDashboardProps) => {
                     <>
                       <Upload className="h-12 w-12 text-primary" />
                       <p className="text-lg font-semibold">
-                        {canUploadMore 
-                          ? "Click to upload screenshots (up to 4)"
-                          : "Match limit reached"}
+                        Click to upload screenshots (up to 4)
                       </p>
                       <p className="text-sm text-muted-foreground">
                         {canUploadMore 
