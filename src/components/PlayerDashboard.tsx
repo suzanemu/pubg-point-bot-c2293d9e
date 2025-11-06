@@ -6,10 +6,12 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Upload, LogOut, Loader2, Trophy, AlertCircle } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Upload, LogOut, Loader2, Trophy, AlertCircle, Images } from "lucide-react";
 import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
 import Standings from "./Standings";
+import ScreenshotGallery from "./ScreenshotGallery";
 import { Team, Tournament } from "@/types/tournament";
 
 interface PlayerDashboardProps {
@@ -323,6 +325,25 @@ const PlayerDashboard = ({ userId }: PlayerDashboardProps) => {
           </Button>
         </div>
 
+        {/* Tabs */}
+        <Tabs defaultValue="upload" className="w-full">
+          <TabsList className="grid w-full grid-cols-3 bg-muted">
+            <TabsTrigger value="upload" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+              <Upload className="mr-2 h-4 w-4" />
+              Upload
+            </TabsTrigger>
+            <TabsTrigger value="gallery" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+              <Images className="mr-2 h-4 w-4" />
+              Gallery
+            </TabsTrigger>
+            <TabsTrigger value="standings" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+              <Trophy className="mr-2 h-4 w-4" />
+              Standings
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="upload" className="mt-6 space-y-6">
+
         {/* Tournament Selection Card */}
         {tournaments.length > 0 ? (
           <Card className="p-6 border-primary/30 bg-gradient-to-br from-primary/5 to-primary/10">
@@ -466,8 +487,20 @@ const PlayerDashboard = ({ userId }: PlayerDashboardProps) => {
           </Card>
         )}
 
-        {/* Standings */}
-        {teams.length > 0 && <Standings teams={teams} />}
+          </TabsContent>
+
+          <TabsContent value="gallery" className="mt-6">
+            <ScreenshotGallery isAdmin={false} />
+          </TabsContent>
+
+          <TabsContent value="standings" className="mt-6">
+            {teams.length > 0 ? <Standings teams={teams} /> : (
+              <div className="text-center py-12 text-muted-foreground">
+                <p>No data available yet</p>
+              </div>
+            )}
+          </TabsContent>
+        </Tabs>
       </div>
     </div>
   );

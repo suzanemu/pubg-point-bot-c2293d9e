@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
-import { LogOut } from "lucide-react";
+import { LogOut, Trophy, Users, Image, Images } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -9,6 +9,7 @@ import TeamManager from "./TeamManager";
 import TournamentManager from "./TournamentManager";
 import ScreenshotVerification from "./ScreenshotVerification";
 import Standings from "./Standings";
+import ScreenshotGallery from "./ScreenshotGallery";
 import { Team, Tournament } from "@/types/tournament";
 
 interface AdminDashboardProps {
@@ -163,11 +164,27 @@ const AdminDashboard = ({ userId }: AdminDashboardProps) => {
 
         {/* Tabs */}
         <Tabs defaultValue="standings" className="w-full">
-          <TabsList className="grid w-full grid-cols-4">
-            <TabsTrigger value="standings">Standings</TabsTrigger>
-            <TabsTrigger value="screenshots">Verify Screenshots</TabsTrigger>
-            <TabsTrigger value="teams">Manage Teams</TabsTrigger>
-            <TabsTrigger value="tournaments">Tournaments</TabsTrigger>
+          <TabsList className="grid w-full grid-cols-5">
+            <TabsTrigger value="standings">
+              <Trophy className="mr-2 h-4 w-4" />
+              Standings
+            </TabsTrigger>
+            <TabsTrigger value="screenshots">
+              <Image className="mr-2 h-4 w-4" />
+              Verify
+            </TabsTrigger>
+            <TabsTrigger value="gallery">
+              <Images className="mr-2 h-4 w-4" />
+              Gallery
+            </TabsTrigger>
+            <TabsTrigger value="teams">
+              <Users className="mr-2 h-4 w-4" />
+              Teams
+            </TabsTrigger>
+            <TabsTrigger value="tournaments">
+              <Trophy className="mr-2 h-4 w-4" />
+              Tournaments
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="standings" className="mt-6">
@@ -192,6 +209,10 @@ const AdminDashboard = ({ userId }: AdminDashboardProps) => {
                 <p>Please select a tournament first.</p>
               </div>
             )}
+          </TabsContent>
+
+          <TabsContent value="gallery" className="mt-6">
+            <ScreenshotGallery isAdmin={true} />
           </TabsContent>
 
           <TabsContent value="teams" className="mt-6">
