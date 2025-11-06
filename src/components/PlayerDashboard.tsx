@@ -324,7 +324,7 @@ const PlayerDashboard = ({ userId }: PlayerDashboardProps) => {
         </div>
 
         {/* Tournament Selection Card */}
-        {tournaments.length > 0 && (
+        {tournaments.length > 0 ? (
           <Card className="p-6 border-primary/30 bg-gradient-to-br from-primary/5 to-primary/10">
             <h2 className="text-2xl font-bold mb-4 flex items-center gap-2">
               <Trophy className="h-6 w-6 text-primary-glow" />
@@ -355,6 +355,18 @@ const PlayerDashboard = ({ userId }: PlayerDashboardProps) => {
                   )}
                 </div>
               )}
+            </div>
+          </Card>
+        ) : (
+          <Card className="p-8 border-primary/30 bg-gradient-to-br from-primary/5 to-primary/10">
+            <div className="text-center space-y-4">
+              <Trophy className="h-16 w-16 text-primary-glow mx-auto opacity-50" />
+              <div>
+                <h2 className="text-2xl font-bold mb-2">No Tournaments Available</h2>
+                <p className="text-muted-foreground">
+                  Please contact an administrator to create a tournament before uploading screenshots.
+                </p>
+              </div>
             </div>
           </Card>
         )}
