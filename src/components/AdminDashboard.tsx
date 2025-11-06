@@ -122,7 +122,6 @@ const AdminDashboard = ({ userId }: AdminDashboardProps) => {
 
   const handleSignOut = async () => {
     await supabase.auth.signOut();
-    navigate("/auth");
   };
 
   return (

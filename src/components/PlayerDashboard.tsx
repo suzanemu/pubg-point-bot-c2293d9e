@@ -150,7 +150,6 @@ const PlayerDashboard = ({ userId }: PlayerDashboardProps) => {
 
   const handleSignOut = async () => {
     await supabase.auth.signOut();
-    navigate("/auth");
   };
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
