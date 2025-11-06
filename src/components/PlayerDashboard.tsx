@@ -21,7 +21,8 @@ const PlayerDashboard = ({ userId }: PlayerDashboardProps) => {
   const [teams, setTeams] = useState<Team[]>([]);
   const [allTeams, setAllTeams] = useState<{ id: string; name: string; logo_url?: string }[]>([]);
   const [selectedTeamId, setSelectedTeamId] = useState<string>("");
-  const [tournament, setTournament] = useState<Tournament | null>(null);
+  const [tournaments, setTournaments] = useState<Tournament[]>([]);
+  const [selectedTournamentId, setSelectedTournamentId] = useState<string>("");
   const [selectedDay, setSelectedDay] = useState<number>(1);
   const [uploading, setUploading] = useState(false);
   const [analyzing, setAnalyzing] = useState(false);
@@ -29,54 +30,66 @@ const PlayerDashboard = ({ userId }: PlayerDashboardProps) => {
   const [teamUploadCounts, setTeamUploadCounts] = useState<Record<string, number>>({});
 
   useEffect(() => {
-    fetchTournamentAndTeams();
+    fetchTournaments();
   }, []);
+
+  useEffect(() => {
+    if (selectedTournamentId) {
+      fetchTeamsForTournament();
+    }
+  }, [selectedTournamentId]);
 
   useEffect(() => {
     // Auto-refresh every 5 seconds
     const interval = setInterval(() => {
-      fetchTeams();
+      if (selectedTournamentId) {
+        fetchTeams();
+      }
     }, 5000);
     
     return () => clearInterval(interval);
-  }, [tournament?.id]);
+  }, [selectedTournamentId]);
 
-  const fetchTournamentAndTeams = async () => {
-    // Fetch the first tournament (or you can let user select)
-    const { data: tournamentData } = await supabase
+  const fetchTournaments = async () => {
+    const { data: tournamentsData } = await supabase
       .from("tournaments")
       .select("*")
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .single();
+      .order("created_at", { ascending: false });
 
-    if (tournamentData) {
-      setTournament(tournamentData);
-      
-      // Fetch all teams in this tournament
-      const { data: teamsData } = await supabase
-        .from("teams")
-        .select("id, name, logo_url")
-        .eq("tournament_id", tournamentData.id);
-      
-      if (teamsData) {
-        setAllTeams(teamsData);
-        if (teamsData.length > 0 && !selectedTeamId) {
-          setSelectedTeamId(teamsData[0].id);
-        }
+    if (tournamentsData && tournamentsData.length > 0) {
+      setTournaments(tournamentsData);
+      // Auto-select first tournament if none selected
+      if (!selectedTournamentId) {
+        setSelectedTournamentId(tournamentsData[0].id);
       }
-      
-      fetchTeams();
     }
   };
 
+  const fetchTeamsForTournament = async () => {
+    if (!selectedTournamentId) return;
+
+    // Fetch all teams in selected tournament
+    const { data: teamsData } = await supabase
+      .from("teams")
+      .select("id, name, logo_url")
+      .eq("tournament_id", selectedTournamentId);
+    
+    if (teamsData) {
+      setAllTeams(teamsData);
+      // Reset team selection when tournament changes
+      setSelectedTeamId("");
+    }
+    
+    fetchTeams();
+  };
+
   const fetchTeams = async () => {
-    if (!tournament?.id) return;
+    if (!selectedTournamentId) return;
 
     const { data, error } = await supabase
       .from("teams")
       .select("id, name, created_at")
-      .eq("tournament_id", tournament.id);
+      .eq("tournament_id", selectedTournamentId);
 
     if (error) {
       console.error("Error fetching teams:", error);
@@ -310,122 +323,136 @@ const PlayerDashboard = ({ userId }: PlayerDashboardProps) => {
           </Button>
         </div>
 
-        {/* Tournament Info Card */}
-        {tournament && (
+        {/* Tournament Selection Card */}
+        {tournaments.length > 0 && (
           <Card className="p-6 border-primary/30 bg-gradient-to-br from-primary/5 to-primary/10">
             <h2 className="text-2xl font-bold mb-4 flex items-center gap-2">
               <Trophy className="h-6 w-6 text-primary-glow" />
-              Tournament Info
+              Tournament Selection
             </h2>
             <div className="space-y-4">
-              <div>
-                <h3 className="font-semibold text-lg">{tournament.name}</h3>
-                {tournament.description && (
-                  <p className="text-sm text-muted-foreground mt-1">
-                    {tournament.description}
-                  </p>
-                )}
+              <div className="space-y-2">
+                <Label htmlFor="tournamentSelect">Select Tournament</Label>
+                <Select value={selectedTournamentId} onValueChange={setSelectedTournamentId}>
+                  <SelectTrigger className="bg-input border-border">
+                    <SelectValue placeholder="Choose a tournament" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-popover border-border z-50">
+                    {tournaments.map((tournament) => (
+                      <SelectItem key={tournament.id} value={tournament.id}>
+                        {tournament.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
-              <div className="text-center p-4 bg-background/50 rounded-lg border border-border">
-                <p className="text-sm text-muted-foreground">Total Matches</p>
-                <p className="text-2xl font-bold">{tournament.total_matches}</p>
-              </div>
+              {selectedTournamentId && tournaments.find(t => t.id === selectedTournamentId) && (
+                <div>
+                  {tournaments.find(t => t.id === selectedTournamentId)?.description && (
+                    <p className="text-sm text-muted-foreground">
+                      {tournaments.find(t => t.id === selectedTournamentId)?.description}
+                    </p>
+                  )}
+                </div>
+              )}
             </div>
           </Card>
         )}
 
         {/* Upload Card */}
-        <Card className="p-6 border-primary/30">
-          <h2 className="text-2xl font-bold mb-4">Upload Match Screenshot</h2>
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="teamSelect">Select Team</Label>
-              <Select value={selectedTeamId} onValueChange={setSelectedTeamId}>
-                <SelectTrigger className="bg-input border-border max-w-xs">
-                  <SelectValue placeholder="Choose a team" />
-                </SelectTrigger>
-                <SelectContent className="bg-popover border-border z-50">
-                  {allTeams.map((team) => (
-                    <SelectItem key={team.id} value={team.id}>
-                      <div className="flex items-center gap-2">
-                        {team.logo_url && (
-                          <img 
-                            src={team.logo_url} 
-                            alt={team.name}
-                            className="w-5 h-5 rounded object-cover"
-                          />
-                        )}
-                        {team.name}
-                      </div>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {selectedTeamId && (
-                <p className="text-xs text-muted-foreground">
-                  Uploads: {teamUploadCounts[selectedTeamId] || 0}/12
-                </p>
-              )}
-            </div>
+        {selectedTournamentId && (
+          <Card className="p-6 border-primary/30">
+            <h2 className="text-2xl font-bold mb-4">Upload Match Screenshot</h2>
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="teamSelect">Select Team</Label>
+                <Select value={selectedTeamId} onValueChange={setSelectedTeamId}>
+                  <SelectTrigger className="bg-background border-border max-w-xs">
+                    <SelectValue placeholder="Choose a team" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-background border-border z-50 shadow-lg">
+                    {allTeams.map((team) => (
+                      <SelectItem key={team.id} value={team.id} className="cursor-pointer">
+                        <div className="flex items-center gap-2">
+                          {team.logo_url && (
+                            <img 
+                              src={team.logo_url} 
+                              alt={team.name}
+                              className="w-5 h-5 rounded object-cover"
+                            />
+                          )}
+                          <span>{team.name}</span>
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {selectedTeamId && (
+                  <p className="text-xs text-muted-foreground">
+                    Uploads: {teamUploadCounts[selectedTeamId] || 0}/12
+                  </p>
+                )}
+              </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="daySelect">Select Day</Label>
-              <Select value={selectedDay.toString()} onValueChange={(v) => setSelectedDay(parseInt(v))}>
-                <SelectTrigger className="bg-input border-border max-w-xs">
-                  <SelectValue placeholder="Choose a day" />
-                </SelectTrigger>
-                <SelectContent className="bg-popover border-border z-50">
-                  <SelectItem value="1">Day 1 (4 matches)</SelectItem>
-                  <SelectItem value="2">Day 2 (4 matches)</SelectItem>
-                  <SelectItem value="3">Day 3 (4 matches)</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+              <div className="space-y-2">
+                <Label htmlFor="daySelect">Select Day</Label>
+                <Select value={selectedDay.toString()} onValueChange={(v) => setSelectedDay(parseInt(v))}>
+                  <SelectTrigger className="bg-background border-border max-w-xs">
+                    <SelectValue placeholder="Choose a day" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-background border-border z-50 shadow-lg">
+                    <SelectItem value="1" className="cursor-pointer">Day 1 (4 matches)</SelectItem>
+                    <SelectItem value="2" className="cursor-pointer">Day 2 (4 matches)</SelectItem>
+                    <SelectItem value="3" className="cursor-pointer">Day 3 (4 matches)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="screenshot">Upload Screenshots (Max 4)</Label>
-              <div className="border-2 border-dashed border-primary/30 rounded-lg p-8 text-center hover:border-primary/50 transition-colors">
-                <input
-                  id="screenshot"
-                  type="file"
-                  accept="image/*"
-                  multiple
-                  onChange={handleFileUpload}
-                  disabled={!selectedTeamId || uploading || analyzing}
-                  className="hidden"
-                />
-                <label
-                  htmlFor="screenshot"
-                  className="cursor-pointer flex flex-col items-center gap-2"
-                >
-                  {uploading || analyzing ? (
-                    <>
-                      <Loader2 className="h-12 w-12 text-primary animate-spin" />
-                      <p className="text-lg font-semibold">
-                        {uploadProgress || (uploading ? "Uploading..." : "Analyzing with AI...")}
-                      </p>
-                      <p className="text-sm text-muted-foreground">
-                        Please wait while we process your screenshots
-                      </p>
-                    </>
-                  ) : (
-                    <>
-                      <Upload className="h-12 w-12 text-primary" />
-                      <p className="text-lg font-semibold">
-                        Click to upload screenshots (up to 4)
-                      </p>
-                      <p className="text-sm text-muted-foreground">
-                        {canUploadMore 
-                          ? "AI will automatically extract placement and kills from each"
-                          : "You have uploaded all allowed matches"}
-                      </p>
-                    </>
-                  )}
-                </label>
+              <div className="space-y-2">
+                <Label htmlFor="screenshot">Upload Screenshots (Max 4)</Label>
+                <div className="border-2 border-dashed border-primary/30 rounded-lg p-8 text-center hover:border-primary/50 transition-colors">
+                  <input
+                    id="screenshot"
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    onChange={handleFileUpload}
+                    disabled={!selectedTeamId || uploading || analyzing}
+                    className="hidden"
+                  />
+                  <label
+                    htmlFor="screenshot"
+                    className="cursor-pointer flex flex-col items-center gap-2"
+                  >
+                    {uploading || analyzing ? (
+                      <>
+                        <Loader2 className="h-12 w-12 text-primary animate-spin" />
+                        <p className="text-lg font-semibold">
+                          {uploadProgress || (uploading ? "Uploading..." : "Analyzing with AI...")}
+                        </p>
+                        <p className="text-sm text-muted-foreground">
+                          Please wait while we process your screenshots
+                        </p>
+                      </>
+                    ) : (
+                      <>
+                        <Upload className="h-12 w-12 text-primary" />
+                        <p className="text-lg font-semibold">
+                          Click to upload screenshots (up to 4)
+                        </p>
+                        <p className="text-sm text-muted-foreground">
+                          {canUploadMore 
+                            ? "AI will automatically extract placement and kills from each"
+                            : "You have uploaded all allowed matches"}
+                        </p>
+                      </>
+                    )}
+                  </label>
+                </div>
               </div>
             </div>
-          </div>
-        </Card>
+          </Card>
+        )}
 
         {/* Standings */}
         {teams.length > 0 && <Standings teams={teams} />}
