@@ -22,11 +22,11 @@ const PlayerDashboard = ({ userId }: PlayerDashboardProps) => {
   const [allTeams, setAllTeams] = useState<{ id: string; name: string; logo_url?: string }[]>([]);
   const [selectedTeamId, setSelectedTeamId] = useState<string>("");
   const [tournament, setTournament] = useState<Tournament | null>(null);
-  const [matchNumber, setMatchNumber] = useState(1);
+  const [selectedDay, setSelectedDay] = useState<number>(1);
   const [uploading, setUploading] = useState(false);
   const [analyzing, setAnalyzing] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<string>("");
-  const [uploadedMatches, setUploadedMatches] = useState<number>(0);
+  const [teamUploadCounts, setTeamUploadCounts] = useState<Record<string, number>>({});
 
   useEffect(() => {
     fetchTournamentAndTeams();
@@ -89,6 +89,14 @@ const PlayerDashboard = ({ userId }: PlayerDashboardProps) => {
         .from("match_screenshots")
         .select("team_id, placement, kills, points");
 
+      // Count uploads per team
+      const uploadCounts: Record<string, number> = {};
+      data.forEach((team) => {
+        const teamMatches = allMatches?.filter((m) => m.team_id === team.id) || [];
+        uploadCounts[team.id] = teamMatches.length;
+      });
+      setTeamUploadCounts(uploadCounts);
+
       const teamsData: Team[] = data.map((team) => {
         const teamMatches = allMatches?.filter((m) => m.team_id === team.id) || [];
         let totalPoints = 0;
@@ -142,16 +150,17 @@ const PlayerDashboard = ({ userId }: PlayerDashboardProps) => {
       return;
     }
 
-    // Check match limit
-    if (tournament && uploadedMatches >= tournament.total_matches) {
-      toast.error(`You have reached the maximum number of matches (${tournament.total_matches}) for this tournament`);
+    // Check if team has reached 12 uploads limit
+    const currentUploads = teamUploadCounts[selectedTeamId] || 0;
+    if (currentUploads >= 12) {
+      toast.error("This team has already uploaded the maximum 12 screenshots");
       return;
     }
 
     // Check if adding these files would exceed the limit
-    if (tournament && (uploadedMatches + files.length) > tournament.total_matches) {
-      const remaining = tournament.total_matches - uploadedMatches;
-      toast.error(`You can only upload ${remaining} more screenshot${remaining > 1 ? 's' : ''} for this tournament`);
+    if ((currentUploads + files.length) > 12) {
+      const remaining = 12 - currentUploads;
+      toast.error(`This team can only upload ${remaining} more screenshot${remaining > 1 ? 's' : ''}`);
       return;
     }
 
@@ -234,7 +243,7 @@ const PlayerDashboard = ({ userId }: PlayerDashboardProps) => {
             .insert({
               team_id: selectedTeamId,
               player_id: userId,
-              match_number: matchNumber + i,
+              day: selectedDay,
               screenshot_url: publicUrl,
               placement,
               kills,
@@ -257,7 +266,6 @@ const PlayerDashboard = ({ userId }: PlayerDashboardProps) => {
       // Show results
       if (successCount > 0) {
         toast.success(`Successfully uploaded ${successCount} screenshot${successCount > 1 ? 's' : ''}!`);
-        setMatchNumber(matchNumber + successCount);
       }
       
       if (failCount > 0) {
@@ -279,7 +287,7 @@ const PlayerDashboard = ({ userId }: PlayerDashboardProps) => {
     }
   };
 
-  const canUploadMore = !tournament || uploadedMatches < tournament.total_matches;
+  const canUploadMore = selectedTeamId && (teamUploadCounts[selectedTeamId] || 0) < 12;
 
   return (
     <div className="min-h-screen p-4 md:p-8">
@@ -336,7 +344,7 @@ const PlayerDashboard = ({ userId }: PlayerDashboardProps) => {
                 <SelectTrigger className="bg-input border-border max-w-xs">
                   <SelectValue placeholder="Choose a team" />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="bg-popover border-border z-50">
                   {allTeams.map((team) => (
                     <SelectItem key={team.id} value={team.id}>
                       <div className="flex items-center gap-2">
@@ -353,18 +361,25 @@ const PlayerDashboard = ({ userId }: PlayerDashboardProps) => {
                   ))}
                 </SelectContent>
               </Select>
+              {selectedTeamId && (
+                <p className="text-xs text-muted-foreground">
+                  Uploads: {teamUploadCounts[selectedTeamId] || 0}/12
+                </p>
+              )}
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="matchNumber">Match Number</Label>
-              <Input
-                id="matchNumber"
-                type="number"
-                min="1"
-                value={matchNumber}
-                onChange={(e) => setMatchNumber(parseInt(e.target.value) || 1)}
-                className="bg-input border-border max-w-xs"
-              />
+              <Label htmlFor="daySelect">Select Day</Label>
+              <Select value={selectedDay.toString()} onValueChange={(v) => setSelectedDay(parseInt(v))}>
+                <SelectTrigger className="bg-input border-border max-w-xs">
+                  <SelectValue placeholder="Choose a day" />
+                </SelectTrigger>
+                <SelectContent className="bg-popover border-border z-50">
+                  <SelectItem value="1">Day 1 (4 matches)</SelectItem>
+                  <SelectItem value="2">Day 2 (4 matches)</SelectItem>
+                  <SelectItem value="3">Day 3 (4 matches)</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
 
             <div className="space-y-2">

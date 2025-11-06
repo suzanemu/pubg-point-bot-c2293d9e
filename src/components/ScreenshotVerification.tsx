@@ -26,7 +26,7 @@ interface MatchScreenshot {
   id: string;
   team_id: string;
   team_name: string;
-  match_number: number;
+  day: number;
   placement: number | null;
   kills: number | null;
   points: number | null;
@@ -177,7 +177,7 @@ const ScreenshotVerification = ({ selectedTournament }: ScreenshotVerificationPr
                      onClick={() => handleViewImage(screenshot)}>
                   <img
                     src={getPublicUrl(screenshot.screenshot_url)}
-                    alt={`Match ${screenshot.match_number}`}
+                    alt={`Day ${screenshot.day}`}
                     className="w-full h-full object-cover"
                   />
                   <div className="absolute inset-0 bg-black/50 opacity-0 hover:opacity-100 transition-opacity flex items-center justify-center">
@@ -188,7 +188,7 @@ const ScreenshotVerification = ({ selectedTournament }: ScreenshotVerificationPr
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
                     <h3 className="font-bold text-sm truncate">{screenshot.team_name}</h3>
-                    <span className="text-xs text-muted-foreground">Match #{screenshot.match_number}</span>
+                    <span className="text-xs text-muted-foreground">Day {screenshot.day}</span>
                   </div>
                   
                   <div className="grid grid-cols-3 gap-2 text-sm">
@@ -233,7 +233,7 @@ const ScreenshotVerification = ({ selectedTournament }: ScreenshotVerificationPr
             <div className="space-y-4">
               <div>
                 <p className="text-sm text-muted-foreground">Team: {selectedScreenshot.team_name}</p>
-                <p className="text-sm text-muted-foreground">Match: #{selectedScreenshot.match_number}</p>
+                <p className="text-sm text-muted-foreground">Day: {selectedScreenshot.day}</p>
               </div>
 
               <div className="space-y-2">
@@ -295,7 +295,7 @@ const ScreenshotVerification = ({ selectedTournament }: ScreenshotVerificationPr
         <DialogContent className="max-w-4xl">
           <DialogHeader>
             <DialogTitle>
-              {selectedScreenshot?.team_name} - Match #{selectedScreenshot?.match_number}
+              {selectedScreenshot?.team_name} - Day {selectedScreenshot?.day}
             </DialogTitle>
           </DialogHeader>
           
@@ -303,7 +303,7 @@ const ScreenshotVerification = ({ selectedTournament }: ScreenshotVerificationPr
             <div className="space-y-4">
               <img
                 src={getPublicUrl(selectedScreenshot.screenshot_url)}
-                alt={`Match ${selectedScreenshot.match_number}`}
+                alt={`Day ${selectedScreenshot.day}`}
                 className="w-full rounded-lg"
               />
             </div>

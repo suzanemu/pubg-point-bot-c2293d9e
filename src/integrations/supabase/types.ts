@@ -60,9 +60,9 @@ export type Database = {
         Row: {
           analyzed_at: string | null
           created_at: string | null
+          day: number
           id: string
           kills: number | null
-          match_number: number
           placement: number | null
           player_id: string
           points: number | null
@@ -72,9 +72,9 @@ export type Database = {
         Insert: {
           analyzed_at?: string | null
           created_at?: string | null
+          day?: number
           id?: string
           kills?: number | null
-          match_number: number
           placement?: number | null
           player_id: string
           points?: number | null
@@ -84,9 +84,9 @@ export type Database = {
         Update: {
           analyzed_at?: string | null
           created_at?: string | null
+          day?: number
           id?: string
           kills?: number | null
-          match_number?: number
           placement?: number | null
           player_id?: string
           points?: number | null
