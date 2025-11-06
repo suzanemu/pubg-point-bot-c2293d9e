@@ -92,14 +92,17 @@ const Auth = () => {
       const { data: authData, error: authError } = await supabase.auth.signInAnonymously();
 
       if (authError) {
-        toast.error("Authentication failed");
+        toast.error("Authentication failed: " + authError.message);
         return;
       }
 
       if (!authData.user) {
-        toast.error("Authentication failed");
+        toast.error("Authentication failed - no user returned");
         return;
       }
+
+      // Wait a moment for auth to settle
+      await new Promise(resolve => setTimeout(resolve, 500));
 
       // Create a player session without team_id (they'll select team when uploading)
       const { error: sessionError } = await supabase
@@ -112,12 +115,16 @@ const Auth = () => {
         });
 
       if (sessionError) {
+        console.error("Session creation error:", sessionError);
         await supabase.auth.signOut();
-        toast.error("Failed to create session");
+        toast.error("Failed to create session: " + sessionError.message);
         return;
       }
 
-      toast.success("Welcome! You can now submit screenshots.");
+      toast.success("Welcome! Redirecting to dashboard...");
+      
+      // Wait a bit before navigation to ensure session is saved
+      await new Promise(resolve => setTimeout(resolve, 500));
       navigate("/");
     } catch (error) {
       console.error("Player access error:", error);

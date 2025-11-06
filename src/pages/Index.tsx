@@ -12,7 +12,21 @@ const Index = () => {
   const [userRole, setUserRole] = useState<"admin" | "player" | null>(null);
 
   useEffect(() => {
+    // Set up auth state listener
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      (_event, session) => {
+        if (session) {
+          checkAuth();
+        } else {
+          navigate("/auth");
+        }
+      }
+    );
+
+    // Check initial session
     checkAuth();
+
+    return () => subscription.unsubscribe();
   }, []);
 
   const checkAuth = async () => {
@@ -30,10 +44,16 @@ const Index = () => {
       .from("sessions")
       .select("role")
       .eq("user_id", session.user.id)
-      .single();
+      .maybeSingle();
 
     if (error) {
       console.error("Error fetching session:", error);
+      navigate("/auth");
+      return;
+    }
+
+    if (!sessionData) {
+      console.error("No session data found");
       navigate("/auth");
       return;
     }
